@@ -1,0 +1,812 @@
+---
+title: ''
+header-includes:
+   - \usepackage{ragged2e}
+output: pdf_document
+
+---
+
+# Exercício 3
+
+A hipertensão é um fator de risco para doenças cardiovasculares. Uma pesquisa foi conduzida para verificar o efeito de 4 tratamentos na normalização das medidas de pressão em pacientes hipertensos. Os dados estão apresentados a seguir
+
+\center
+\begin{tabular}{llll}
+\hline
+T1 & T2 & T3 & T4 \\ \hline
+96 & 71 & 73 & 87 \\
+104 & 85 & 96 & 76 \\
+92 & 89 & 83 & 90 \\
+101 & 110 & 97 & 85 \\
+112 & 85 & 100 & 94 \\
+100 & 73 & 101 & 93 \\
+93 & 81 & 88 & 85 \\ \hline
+\end{tabular}
+\justify
+
+(a) Realize uma análise descritiva dos dados.
+
+### Resulução
+
+```{r echo=F}
+library(ggplot2)
+dados <- c(96 , 71, 73 , 87 , 104, 85 , 96 , 76, 
+           92 , 89, 83 , 90 , 101, 110, 97 , 85, 
+           112, 85, 100, 94 , 100, 73 , 101, 93, 
+           93 , 81, 88 , 85)
+
+dados.df <- as.data.frame(t(matrix(dados, 4, 7)))
+colnames(dados.df) <- c("T1", "T2", "T3", "T4")
+dados.df <- stack(dados.df )
+colnames(dados.df) <- c("resp", "treat")
+
+summary(dados.df)
+```
+\center
+```{r echo=F, out.width='70%'}
+ggplot(dados.df, aes(x=treat, y=resp)) +
+  geom_boxplot(fill='#A4A4A4', color="black") 
+```
+\justify
+
+Fazendo uma análise descritiva utizando as estatísticas sumárias e um box-plot para cada tratamento podemos notar uma certa diferença na média entre os tratamentos de normalização das medidas de pressão, também podemos notar pelos intervalos interquatis de cada tratramento que as variâncias não são heterogêneas.
+
+(b) Proponha um modelo estatístico (estrutural e distribucional) apropriado para a análise destes dados. Represente o modelo proposto na forma matricial de um modelo linear. Interprete os parâmetros do modelo
+
+### Resolução
+
+Um modelo estaístico estrural de Delineamento Completamente Aleatorizado (DCA): 4 tratamentos, 7 réplicas (balanceado) com parametrização de casela de referência é da forma: $$Y_{ij}= \left\{ \begin{array}{ll}
+\mu_1 + e_{ij} \ ,\   j=1\\ 
+\mu_1 + \tau_j + e_{ij}  \ , \ j=2,3,4 \end{array} \right.\ $$
+Onde $\mu_1$ é o valor esperado da resposta para unidades submetidas ao tratamento T1 (considerado como referência) e $\tau_j \ (j=2,3,4)$ é o efeito do tratamento $T_j$ em relação ao valor esperado da resposta ao tratamento T1 (é o desvio em relação a esta referência) 
+
+E $e_{ij} \sim N(0,\sigma^2)$ é o modelo distribucional para o DCA
+
+E também pode ser representado na forma matricial: $$Y_{7 \times 1}=X_{7 \times 4}\beta_{4 \times 1} + e_{7 \times 1}$$
+
+Onde $Y_{7 \times 1}$ é o vetor de observações, $X_{7 \times 4}$ é matriz de planejamento, $\beta_{4 \times 1}$ é o vetor de parâmetros do modelo e $e_{7 \times 1}$ é o vetor de resíduos.
+
+(c) Obtenha a tabela de ANOVA correspondente ao modelo proposto em b). Realize uma análise de diagnóstico. Há efeito significante de "tratamento"?
+
+### Resolução
+
+\center
+```{r echo=F}
+model <- lm(resp~treat, dados.df)
+model1 <- aov(resp~treat, dados.df)
+
+# objetos que podem ser inspecionados
+anov <- anova(model)
+
+knitr::kable(caption = "Tabela de ANOVA", anov)
+```
+
+```{r echo=F,out.width='80%'}
+# Verificação de independência
+s2 <- anov$"Mean Sq"[2] 
+res <- model1$res
+par(mfrow=c(2,2))
+plot(res, type="l",xlab="Observações", ylab="Resíduos")
+abline(h=0, col="red")
+
+plot(model$fit, model1$res, xlab="Valores Ajustados", ylab="Resíduos")
+title("Resíduos vs Preditos")
+
+respad <- (res/sqrt(s2))
+boxplot(respad)
+title("Resíduos Padronizados")
+
+hist(respad, main=NULL, xlab="Resíduos padronizados",ylab="Frequência")
+title("Histograma dos Resíduos padronizados")
+```
+
+```{r echo=F}
+library(car)
+# Teste de normalidade de Shapiro-Wilk
+shapiro.test(res)  
+
+# Teste de homocedasticidade
+leveneTest(model) 
+bartlett.test(resp~treat,data = dados.df)  
+```
+\justify
+
+Obervando o gráfico de resíduos x numero de observação, podemos concluir que que existe uma espécie de "zig-zag" o que como visto em aula nos garante a hipótese de independência, além disso observando o gráfico QQ-Plot  e o teste shapiro obtemos um p-valor de 0.71, que a um nível de significância de 5% temos evidencias estatísticas para aceitar que os dados seguem distribuição Normal, para avaliar a homocedasticidade podemos observar pelo gráfico de resíduos x valores ajustados que o mesmo está em um formato de "caixa", além disso utilizando testes de levine e bartlett obtemos um p-valor de 0.794 e 0.266 respectivamente e a um nível de significância de 5% podemos aceitar a hipótese de homocedasticidade.
+
+(d) Obtenha intervalos de confiança para a diferença entre os pares de médias. Considere intervalos construídos sem correção para múltiplos testes, intervalos simultâneos com a correção de Bonferroni, Tukey e FDR. Compare os resultados e conclua sobre o possível efeito de tratamento.
+
+### Resolução
+
+\center
+```{r, echo=F, out.width='70%'}
+fit.tu <- TukeyHSD(model1)
+fit.tu
+plot(fit.tu,cex.axis = 0.5)
+
+# Calculando o valor crítico do método de Tukey
+n <- dim(dados.df)[1]
+K <- length(levels(dados.df$treat))
+
+qtu <- qtukey(0.95,nmeans=K,df=n-K)
+
+# I.C. para a diferença entre médias dos grupos
+# Diferença entre os grupos 1 e 4
+r <- 7 # número de réplicas (balanceado)
+dif41 <- model$coefficients[4]
+deltatu <- (qtu/sqrt(2))*sqrt(s2)*sqrt(1/r+1/r)
+ic.li41 <- dif41 - deltatu
+ic.ls41 <- dif41 + deltatu
+
+# Diferença entre os grupos 2 e 4
+dif42 <- model$coefficients[4] - model$coefficients[2]
+ic.li42 <- dif42 - deltatu
+ic.ls42 <- dif42 + deltatu
+
+
+deno <- sqrt(s2)*sqrt(1/r+1/r)
+dif21 <- model$coefficients[2]
+dif31 <- model$coefficients[3]
+dif41 <- model$coefficients[4]
+dif32 <- model$coefficients[3] - model$coefficients[2]
+dif42 <- model$coefficients[4] - model$coefficients[2]
+dif43 <- model$coefficients[4] - model$coefficients[3]
+t21 <- dif21/deno
+t31 <- dif31/deno
+t41 <- dif41/deno
+t32 <- dif32/deno
+t42 <- dif42/deno
+t43 <- dif43/deno
+
+pt21<- pt(c(abs(t21)), df=model$df.residual, lower.tail=FALSE)
+pt31<- pt(c(abs(t31)), df=model$df.residual, lower.tail=FALSE)
+pt41<- pt(c(abs(t41)), df=model$df.residual, lower.tail=FALSE)
+pt32<- pt(c(abs(t32)), df=model$df.residual, lower.tail=FALSE)
+pt42<- pt(c(abs(t43)), df=model$df.residual, lower.tail=FALSE)
+pt43<- pt(c(abs(t43)), df=model$df.residual, lower.tail=FALSE)
+
+results <- 2*c(pt21,pt31,pt41,pt32,pt42,pt43)
+```
+Intervalos de confiança com correção de bonferroni
+```{r echo=F}
+adjustp <- p.adjust(results,method="bonferroni")
+cbind(results,adjustp)
+```
+Intervalos de confiança FDR
+```{r echo=F}
+adjustp <- p.adjust(results,method="fdr")
+cbind(results,adjustp)
+```
+\justify
+
+(e) Considerando que o tratamento T1 corresponde a um Placebo, obtenha os intervalos de confiança com correção de Dunnet para estabelecer as comparações entre os demais tratamentos com T1. Comente os resultados.
+
+### Resolução
+
+```{r echo=F}
+library(asbio)
+with(dados.df, pairw.anova(y=resp, x=treat, control="T1", method="dunnett"))
+```
+Logo podemos concluir que T1 e T2 tem diferença médias diferentes, enquanto o T1 e T3 e T1 e T4 tem médias iguais.
+
+(f) Proponha contrastes ortogonais entre os tratamentos. Qual é a SQ e o valor-p para cada contraste e para o conjunto desses contrastes.
+
+### Resolução
+Propondo os contrates ortogonais para testar as seguintes hipótese, temos:
+
+'(T1,T4) vs (T2,T3)' = ( 1, -1, -1,  1)  
+
+'T1 vs T4'           = ( 1,  0,  0, -1)
+
+'T2 vs T3'           = ( 0,  1, -1,  0)
+
+Assim o SQ e o valor-p para cada contraste e para o conjunto desses contrastes segue na tabela abaixo.
+```{r echo=F}
+library(gmodels)
+cmat <- rbind('(T1,T4) vs (T2,T3)' = c( 1, -1, -1,  1),   # Define a matriz dos contrastes ortogonais
+              'T1 vs T4'         = c( 1,  0,  0, -1),
+              'T2 vs T3'         = c( 0,  1, -1,  0))
+
+model2 <- aov(resp ~ treat,
+           data=dados.df,
+           contrasts=list(treat=make.contrasts(cmat)))  # make.contrasts (gmodels): gera matriz dos contrastes
+
+summary(model2,                                          # ANOVA com a SQDtra e GLtra desdobrados em contrastes ortogonais
+        split=list(treat=list('(T1,T4) vs (T2,T3)'=1,
+                            'T1 vs T4  '     =2,
+                            'T2 vs T3'        =3)))
+
+```
+
+# Exercício 4
+
+Uma pesquisa foi conduzida para investigar o efeito da cor do papel (no qual os questionários são impressos) na taxa de resposta. Para a pesquisa de opinião, 100 questionários foram distribuídos aleatoriamente em estacionamentos de grandes supermercados. 15 supermercados foram escolhidos de uma área metropolitana e cada cor foi aleatoriamente atribuída a 5 deles. As taxas de respostas (em %) foram:
+
+| Supermercado / Cor|  1 	|  2 	|  3 	|  4 	|  5 	|
+|------------------	|:--:	|:--:	|:--:	|:--:	|:--:	|
+| Azul             	| 28 	| 26 	| 31 	| 28 	| 35 	|
+| Verde            	| 34 	| 29 	| 25 	| 31 	| 29 	|
+| Laranja          	| 31 	| 25 	| 27 	| 29 	| 28 	|
+
+(a) Realize uma análise descritiva dos dados. Comente os resultados.
+
+### Resolução
+
+```{r echo=F}
+base.r <- c(28,34,31,
+            26,29,25,
+            31,25,27,
+            28,31,29,
+            35,29,28)
+base.r <- as.data.frame(t(matrix(base.r,3,5)))
+rownames(base.r) <- c("1","2","3","4","5")
+colnames(base.r) <- c("Azul","Verde","Laranja")
+
+base <- stack(base.r)
+colnames(base) <- c("resp", "treat")
+
+n <- dim(base)[1]
+K <- length(levels(base$treat))
+
+summary(base)
+```
+\center
+```{r echo=F,out.width='60%'}
+ggplot(base, aes(x=treat, y=resp)) +
+  geom_boxplot(fill='#A4A4A4', color="black")  
+```
+\justify 
+
+Fazendo uma análise descritiva, podemos notar que não existe muita diferença nas médias a partir da cor do panfleto, através de medidas resumo, as quais mostra aonde os dados estão comportados. Outro mecanismo para realizar a estatística descritiva foi o boxplot, este já diferenciando as cores do panfleto, que aparentemente retrata que as médias são bem próximas, o panfleto laranja possui uma menor variabilidade nos dados e o panfleto verde tem uma média maior que os demais.
+
+(b) Assuma um modelo de ANOVA apropriado à análise dos dados. Que suposições foram adotadas? Obtenha os valores ajustados e os resíduos correspondentes ao ajuste do modelo.
+
+### Resolução
+
+Obtendo os valores ajustados:
+```{r echo=F}
+(base$resp-mean(base$resp))/sqrt(var(base$resp))
+
+fit <- aov(resp~treat, base)
+anov <- anova(fit)
+
+```
+
+Os graus de liberdade do SQR, que são igual ao número de amostras menos o número de tratamentos (n - K):
+
+```{r echo=F}
+fit$df.residual
+```
+
+Os resíduos:
+
+```{r echo=F}
+fit$residuals
+```
+
+Os resíduos semi-studentizados:
+
+```{r echo=F}
+fit$residuals/sqrt(anov[3]$`Mean Sq`[2])
+```
+
+Os resíduos studentizados:
+
+```{r echo=F}
+rstudent(lm(base$resp~base$treat))
+```
+
+Para a realização de um modelo ANOVA é necessário as seguintes suposiçõees estejam satisfeitas:
+
+* Homocedasticidade ( Erros com variâncias iguais)
+
+* Normalidade nos dados
+
+* Independencia (entre observações)
+
+(c) Realize uma análise de diagnóstico dos resíduos. Comente se as suposições do modelo de ANOVA clássico estão satisfeitas a estes dados.
+
+### Resolução
+
+Analisando os gráficos abaixo é possível ver que os resíduos estão se comportando como esperado e aparentemente há normalidade nos gráficos, como nas suposições.
+
+\center
+```{r echo=F,out.width='60%'}
+par(mfrow=c(2,2))
+plot(fit)
+```
+\justify
+É possível perceber também a do calculo das médias abaixo (Verde, Laranja e Azul respectivamente) que duas médias dos são exatamente iguais (Verde e Azul): 
+
+```{r echo=F}
+mean(base.r$Verde) 
+mean(base.r$Laranja)
+mean(base.r$Azul)
+```
+
+No primeiro gráfico abaixo, os resíduos estão de maneira independente, cumprindo a última suposição, os demais gráficos é uma análise mais atenta sobre os resíduos:
+\center
+```{r echo=F, out.width='80%'}
+s2 <- anov$"Mean Sq"[2] 
+res <- fit$res
+par(mfrow=c(2,2))
+plot(res, type="l",xlab="Observações", ylab="Resíduos")
+abline(h=0, col="red")
+
+plot(fit$fit, fit$res, xlab="Valores Ajustados", ylab="Resíduos")
+title("Resíduos vs Preditos")
+
+respad <- (res/sqrt(s2))
+boxplot(respad)
+title("Resíduos Padronizados")
+
+hist(respad, main=NULL, xlab="Resíduos padronizados",ylab="Frequência")
+title("Histograma dos Resíduos padronizados")
+```
+\justify
+
+Realindo os testes para a normalidade e homogeneidade das variâncias, aceitamos as hipóteses com seus respectivos p-valores:
+
+```{r warning=F, echo=F}
+library(car)
+
+shapiro.test(res)
+
+leveneTest(fit)  
+bartlett.test(resp~treat,base) 
+
+```
+
+(d) Construa a tabela de ANOVA e interprete os resultados.
+
+### Resolução
+
+Primeiramente, na coluna Df, é obtido os graus de liberdade do tratamento ( 3 tratamentos menos 1) e do resíduos ( 15 dados amostrais menos 3 tratamentos). Em seguida, na coluna Sum Sq e Mean Sq, a soma de quadrados e esses divididos pelos seus respectivos graus de liberdade. Por fim, nas últimas duas colunas é obtido o F valor, dividindo o Mean Sq do tratamento pelo Mean Sq dos res?duos, e o P valor confirmando que as médias dos tratamentos são iguais.
+
+```{r echo=F}
+knitr::kable(caption = "Tabela de ANOVA", anov)
+```
+
+e) Quando um executivo recebeu os resultados dessa pesquisa ele comentou: "Viu? Eu estava certo. Daqui para frente nãs podemos imprimir os questionários em papel branco, que é muito mais barato". Esta conclusão reflete os resultados obtidos da análise dos dados?
+
+### Resolução
+
+Primeiramente, diria que esta hipótese não está sendo testada na pesquisa, o real questionamento é se há diferença entre usar as cores azul, verde e laranja.
+
+Partindo desse pressuposto, é realizado uma análise verificando se há diferença em pares entre duas cores.
+\center
+```{r echo=F, out.width='70%'}
+fit$coefficients
+model.tables(fit, "means", se = TRUE)
+
+fit.tu <- TukeyHSD(fit)
+fit.tu
+plot(fit.tu)
+```
+\justify
+Todos os intervalos tem o 0 contido, logo todas as cores são iguais entre si no quesito a ser testado.
+
+Calculando o valor crítico do método de Tukey, e logo observando que as médias seriam consideradas diferentes com uma diferença de 3.77 da média do Azul.
+
+```{r echo=F}
+qtu <- qtukey(0.95,nmeans=K,df=n-K)
+qtu
+
+```
+
+I.C. para a diferença entre médias dos grupos diferença entre os grupos Azul e Verde
+
+```{r echo=F}
+r <- 5
+dif.av <- fit$coefficients[2]
+deltatu <- (qtu/sqrt(2))*sqrt(s2)*sqrt(1/r+1/r)
+ic.liav <- dif.av - deltatu
+ic.lsav <- dif.av + deltatu
+ic.liav
+ic.lsav
+```
+
+Diferença entre os grupos Azul e Laranja
+
+```{r echo=F}
+dif.al <- fit$coefficients[3]
+ic.lial <- dif.al - deltatu
+ic.lsal <- dif.al + deltatu
+ic.lial
+ic.lsal
+```
+
+Diferença entre os grupos Verde e Laranja
+
+```{r echo=F}
+dif.vl <- fit$coefficients[3] - fit$coefficients[2]
+ic.livl <- dif.vl - deltatu
+ic.lsvl <- dif.vl + deltatu
+ic.livl
+ic.lsvl
+```
+
+# Exercício 5
+
+Depois de ajustar um modelo ANOVA aos dados de um experimento completamente aleatorizado com um fator em 5 níveis, foram obtidos os seguintes resíduos:
+\center
+\begin{tabular}{l|ccccc}
+\textbf{Trat} & \multicolumn{1}{l}{\textbf{T1}} & \multicolumn{1}{l}{\textbf{T2}} & \multicolumn{1}{l}{\textbf{T3}} & \multicolumn{1}{l}{\textbf{T4}} & \multicolumn{1}{l}{\textbf{T5}} \\ \hline
+\textbf{R} & -2 & 26 & -2 & 0 & -4 \\
+\textbf{E} & 0 & -4 & -6 & NA & 0 \\
+\textbf{S} & -4 & -2 & 2 & -2 & -4 \\
+\textbf{Í} & NA & -2 & 2 & -2 & -4 \\
+\textbf{D} & 12 & -6 & NA & 0 & NA \\
+\textbf{U} & -2 & NA & -2 & -4 & -6 \\
+\textbf{O} & 2 & -2 & 2 & 0 & -2
+\end{tabular}
+\justify
+
+Complete os NA’s com valores de sua escolha e faça uma análise de diagnóstico do ajuste do modelo. Construa gráficos apropriados. Interprete.
+
+### Resolução
+
+```{r echo=F}
+res.NA <- c(-2,26,-2,0 ,-4,
+            0 ,-4,-6,NA, 0,
+            -4,-2,2 ,-2,-4,
+            NA,-2,2 ,-2,-4,
+            12,-6,NA,0 ,NA,
+            -2,NA,-2,-4,-6,
+            2 ,-2,2 ,0 ,-2)
+
+res <-   c(-2,26 ,-2,0 ,-4,
+            0 ,-4,-6,-1, 0,
+            -4,-2,2 ,-2,-4,
+            -1,-2,2 ,-2,-4,
+            12,-6,0 ,0 ,-4,
+            -2,-2,-2,-4,-6,
+            2 ,-2,2 ,0 ,-2)
+
+res.df <- as.data.frame(t(matrix(res, 5, 7)))
+colnames(res.df) <- c("T1", "T2", "T3", "T4","T5")
+dados.df <- stack(res.df)
+colnames(res.df) <- c("resp", "treat")
+```
+
+Para substituição dos valores NA propomos a mediana por tratamento por ser uma medida robusta devido o fato de ter valores outliers nos tratamentos.
+
+\center
+\begin{tabular}{l|ccccc}
+\textbf{Trat} & \multicolumn{1}{l}{\textbf{T1}} & \multicolumn{1}{l}{\textbf{T2}} & \multicolumn{1}{l}{\textbf{T3}} & \multicolumn{1}{l}{\textbf{T4}} & \multicolumn{1}{l}{\textbf{T5}} \\ \hline
+\textbf{R} & -2 & 26 & -2 & 0 & -4 \\
+\textbf{E} & 0 & -4 & -6 & -1 & 0 \\
+\textbf{S} & -4 & -2 & 2 & -2 & -4 \\
+\textbf{Í} & -1 & -2 & 2 & -2 & -4 \\
+\textbf{D} & 12 & -6 & 0 & 0 & -4 \\
+\textbf{U} & -2 & -2 & -2 & -4 & -6 \\
+\textbf{O} & 2 & -2 & 2 & 0 & -2
+\end{tabular}
+\justify
+
+Observação: Apresente em um Anexo os comandos (em R ou em outro aplicativo) usados na resolução de exercícios.
+
+\center
+```{r echo=F, out.width='90%'}
+gl.res <- length(res)-5 # Graus de liberdade n-k
+res
+par(mfrow=c(2,2))
+s2 <- sum(res^2)/gl.res # estimativa da variância residual
+
+# Verificação de independência
+plot(res, type="l") # res x índice das observações
+abline(h=0, col="red")
+
+respad <- (res/sqrt(s2)) # resíduos padronizados
+boxplot(respad)
+title("Resíduos Padronizados")
+
+hist(respad, main=NULL)
+title("Histograma dos resíduos padronizados")
+
+qqnorm(res,ylab="Residuos", main=NULL)
+qqline(res)
+title("Gráfico Normal de Probabilidade dos Resíduos")
+
+# Teste de normalidade de Shapiro-Wilk
+# Qual é a hipótese H0
+shapiro.test(res) 
+```
+\justify
+```{r echo=F}
+# Teste de homogeneidade de variâncias
+#bartlett.test(resp~treat,res.df) 
+
+```
+Podemos notar com os gráficos que nenhuma das suposições de para realizar a ANOVA utilizando DCA está satisfeita, pois o de indepêndencia parece ter uma linha de tendência, o teste para homocedasticidade retornou um p-valor < 0.001 que a um nível de significância de 5% rejeitamos a hipótese que os dados tem variâncias homogeneas, além disso analisando o gráfico QQ e o teste de Shapiro que retornou um p-valor <0.001 que a um nível de significância de 5% rejeitamos a hipótese que os dados seguem distribuição normal, ou seja, em hipótese alguma o modelo ANOVA com DCA poderia ser utilizado com tais dados, neste caso seria melhor procurar algum outro modelo estatístico que tenha suposições mais "relaxadas" para se adequar a este problema.  
+
+
+# Códigos
+
+```{r eval=F}
+library(ggplot2)
+library(car)
+library(asbio)
+library(gmodels)
+
+#Exercício 3
+
+# item a
+dados <- c(96 , 71, 73 , 87 , 104, 85 , 96 , 76, 
+           92 , 89, 83 , 90 , 101, 110, 97 , 85, 
+           112, 85, 100, 94 , 100, 73 , 101, 93, 
+           93 , 81, 88 , 85)
+
+dados.df <- as.data.frame(t(matrix(dados, 4, 7)))
+colnames(dados.df) <- c("T1", "T2", "T3", "T4")
+dados.df <- stack(dados.df )
+colnames(dados.df) <- c("resp", "treat")
+
+summary(dados.df)
+
+ggplot(dados.df, aes(x=treat, y=resp)) +
+  geom_boxplot(fill='#A4A4A4', color="black") 
+
+# item c
+model <- lm(resp~treat, dados.df)
+model1 <- aov(resp~treat, dados.df)
+
+anov <- anova(model)
+
+knitr::kable(caption = "Tabela de ANOVA", anov)
+
+# Verificação de independência
+s2 <- anov$"Mean Sq"[2] 
+res <- model1$res
+par(mfrow=c(2,2))
+plot(res, type="l",xlab="Observações", ylab="Resíduos")
+abline(h=0, col="red")
+
+plot(model$fit, model1$res, xlab="Valores Ajustados", ylab="Resíduos")
+title("Resíduos vs Preditos")
+
+respad <- (res/sqrt(s2))
+boxplot(respad)
+title("Resíduos Padronizados")
+
+hist(respad, main=NULL, xlab="Resíduos padronizados",ylab="Frequência")
+title("Histograma dos Resíduos padronizados")
+
+
+# Teste de normalidade de Shapiro-Wilk
+shapiro.test(res)  
+
+# Teste de homocedasticidade
+leveneTest(model) 
+bartlett.test(resp~treat,data = dados.df) 
+
+# item d
+
+fit.tu <- TukeyHSD(model1)
+fit.tu
+plot(fit.tu,cex.axis = 0.5)
+
+
+# Calculando o valor crítico do método de Tukey
+n <- dim(dados.df)[1]
+K <- length(levels(dados.df$treat))
+
+qtu <- qtukey(0.95,nmeans=K,df=n-K)
+
+# I.C. para a diferença entre médias dos grupos
+# Diferença entre os grupos 1 e 4
+r <- 7 # número de réplicas (balanceado)
+dif41 <- model$coefficients[4]
+deltatu <- (qtu/sqrt(2))*sqrt(s2)*sqrt(1/r+1/r)
+ic.li41 <- dif41 - deltatu
+ic.ls41 <- dif41 + deltatu
+
+# Diferença entre os grupos 2 e 4
+dif42 <- model$coefficients[4] - model$coefficients[2]
+ic.li42 <- dif42 - deltatu
+ic.ls42 <- dif42 + deltatu
+
+
+deno <- sqrt(s2)*sqrt(1/r+1/r)
+dif21 <- model$coefficients[2]
+dif31 <- model$coefficients[3]
+dif41 <- model$coefficients[4]
+dif32 <- model$coefficients[3] - model$coefficients[2]
+dif42 <- model$coefficients[4] - model$coefficients[2]
+dif43 <- model$coefficients[4] - model$coefficients[3]
+t21 <- dif21/deno
+t31 <- dif31/deno
+t41 <- dif41/deno
+t32 <- dif32/deno
+t42 <- dif42/deno
+t43 <- dif43/deno
+
+pt21<- pt(c(abs(t21)), df=model$df.residual, lower.tail=FALSE)
+pt31<- pt(c(abs(t31)), df=model$df.residual, lower.tail=FALSE)
+pt41<- pt(c(abs(t41)), df=model$df.residual, lower.tail=FALSE)
+pt32<- pt(c(abs(t32)), df=model$df.residual, lower.tail=FALSE)
+pt42<- pt(c(abs(t43)), df=model$df.residual, lower.tail=FALSE)
+pt43<- pt(c(abs(t43)), df=model$df.residual, lower.tail=FALSE)
+
+results <- 2*c(pt21,pt31,pt41,pt32,pt42,pt43)
+
+adjustp <- p.adjust(results,method="bonferroni")
+cbind(results,adjustp)
+
+adjustp <- p.adjust(results,method="fdr")
+cbind(results,adjustp)
+
+# item e
+
+with(dados.df, pairw.anova(y=resp, x=treat, control="T1", method="dunnett"))
+
+# item f
+
+cmat <- rbind('(T1,T4) vs (T2,T3)' = c( 1, -1, -1,  1),   # Define a matriz dos contrastes ortogonais
+              'T1 vs T4'         = c( 1,  0,  0, -1),
+              'T2 vs T3'         = c( 0,  1, -1,  0))
+
+model2 <- aov(resp ~ treat,
+           data=dados.df,
+           contrasts=list(treat=make.contrasts(cmat)))  # make.contrasts (gmodels): gera matriz dos contrastes
+
+summary(model2,                                          # ANOVA com a SQDtra e GLtra desdobrados em contrastes ortogonais
+        split=list(treat=list('(T1,T4) vs (T2,T3)'=1,
+                            'T1 vs T4  '     =2,
+                            'T2 vs T3'        =3)))
+
+# Exercício 4
+
+#item a
+
+base.r <- c(28,34,31,
+            26,29,25,
+            31,25,27,
+            28,31,29,
+            35,29,28)
+base.r <- as.data.frame(t(matrix(base.r,3,5)))
+rownames(base.r) <- c("1","2","3","4","5")
+colnames(base.r) <- c("Azul","Verde","Laranja")
+
+base <- stack(base.r)
+colnames(base) <- c("resp", "treat")
+
+n <- dim(base)[1]
+K <- length(levels(base$treat))
+
+summary(base)
+
+ggplot(base, aes(x=treat, y=resp)) +
+  geom_boxplot(fill='#A4A4A4', color="black")  
+
+# item b
+(base$resp-mean(base$resp))/sqrt(var(base$resp))
+
+fit <- aov(resp~treat, base)
+anov <- anova(fit)
+
+fit$df.residual
+
+fit$residuals
+
+fit$residuals/sqrt(anov[3]$`Mean Sq`[2])
+
+rstudent(lm(base$resp~base$treat))
+
+# item c
+
+par(mfrow=c(2,2))
+plot(fit)
+
+mean(base.r$Verde) 
+mean(base.r$Laranja)
+mean(base.r$Azul)
+
+s2 <- anov$"Mean Sq"[2] 
+res <- fit$res
+par(mfrow=c(2,2))
+plot(res, type="l",xlab="Observações", ylab="Resíduos")
+abline(h=0, col="red")
+
+plot(fit$fit, fit$res, xlab="Valores Ajustados", ylab="Resíduos")
+title("Resíduos vs Preditos")
+
+respad <- (res/sqrt(s2))
+boxplot(respad)
+title("Resíduos Padronizados")
+
+hist(respad, main=NULL, xlab="Resíduos padronizados",ylab="Frequência")
+title("Histograma dos Resíduos padronizados")
+
+shapiro.test(res)
+
+leveneTest(fit)  
+bartlett.test(resp~treat,base) 
+
+
+# item d
+
+knitr::kable(caption = "Tabela de ANOVA", anov)
+
+# item e
+
+fit$coefficients
+model.tables(fit, "means", se = TRUE)
+
+fit.tu <- TukeyHSD(fit)
+fit.tu
+plot(fit.tu)
+
+qtu <- qtukey(0.95,nmeans=K,df=n-K)
+qtu
+
+r <- 5
+dif.av <- fit$coefficients[2]
+deltatu <- (qtu/sqrt(2))*sqrt(s2)*sqrt(1/r+1/r)
+ic.liav <- dif.av - deltatu
+ic.lsav <- dif.av + deltatu
+ic.liav
+ic.lsav
+
+dif.al <- fit$coefficients[3]
+ic.lial <- dif.al - deltatu
+ic.lsal <- dif.al + deltatu
+ic.lial
+ic.lsal
+
+dif.vl <- fit$coefficients[3] - fit$coefficients[2]
+ic.livl <- dif.vl - deltatu
+ic.lsvl <- dif.vl + deltatu
+ic.livl
+ic.lsvl
+
+# Exercício 5
+
+res.NA <- c(-2,26,-2,0 ,-4,
+            0 ,-4,-6,NA, 0,
+            -4,-2,2 ,-2,-4,
+            NA,-2,2 ,-2,-4,
+            12,-6,NA,0 ,NA,
+            -2,NA,-2,-4,-6,
+            2 ,-2,2 ,0 ,-2)
+
+res <-   c(-2,26 ,-2,0 ,-4,
+           0 ,-4,-6,-1, 0,
+           -4,-2,2 ,-2,-4,
+           -1,-2,2 ,-2,-4,
+           12,-6,0 ,0 ,-4,
+           -2,-2,-2,-4,-6,
+           2 ,-2,2 ,0 ,-2)
+
+res.df <- as.data.frame(t(matrix(res, 5, 7)))
+colnames(res.df) <- c("T1", "T2", "T3", "T4","T5")
+res.df <- stack(res.df)
+colnames(res.df) <- c("resp", "treat")
+
+
+gl.res <- length(res)-5 # Graus de liberdade n-k
+res
+
+s2 <- sum(res^2)/gl.res # estimativa da variância residual
+
+# Verificação de independência
+plot(res, type="l") # res x índice das observações
+abline(h=0, col="red")
+
+respad <- (res/sqrt(s2)) # resíduos padronizados
+boxplot(respad)
+title("Resíduos Padronizados")
+
+hist(respad, main=NULL)
+title("Histograma dos resíduos padronizados")
+
+qqnorm(res,ylab="Residuos", main=NULL)
+qqline(res)
+title("Gráfico Normal de Probabilidade dos Resíduos")
+
+# Teste de normalidade de Shapiro-Wilk
+# Qual é a hipótese H0
+shapiro.test(res) 
+
+# Teste de homogeneidade de variâncias
+bartlett.test(resp~treat,data = res.df) 
+```
