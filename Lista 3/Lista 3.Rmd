@@ -1,0 +1,998 @@
+---
+title: "Lista 3 - MAE0317"
+author: "Guilherme Navarro 8943160, Leonardo 9793436, Diogo 10297481, Eduardo 10263890"
+header-includes:
+   - \usepackage{ragged2e}
+   - \usepackage{multirow}
+output: pdf_document
+---
+
+# Excercício 1
+
+Um estudo foi conduzido para avaliar o efeito de interação entre dois medicamentos (X e Y) usados para estimular o crescimento de crianças acometidas com uma particular síndrome que atinge o desenvolvimento infantil. Sabe-se que o efeito de cada medicamento é modesto, mas o efeito da combinação das duas drogas (X e Y) não tem sido investigado. Os seguintes resultados foram obtidos da avaliação da taxa de crescimento de 16 pacientes:
+
+\center
+\begin{tabular}{cccc}
+\hline
+ & \multicolumn{2}{c}{Pacientes} \\ \cline{1-4} 
+1 & 2 & 3 & 4 \\ \hline
+0.02 (A) & 0.15 (B) & 0.45 (D) & 0.18 (C) \\
+0.27 (B) & 0.24 (C) & -0.01 (A) & 0.58 (D) \\
+0.11 (C) & 0.35 (D) & 0.14 (B) & -0.03 (A) \\
+0.48 (D) & 0.04 (A) & 0.18 (C) & 0.22 (B) \\ \hline
+\end{tabular}
+
+A=Placebo B= Droga X C=Droga Y D=Drogas X e Y
+\justify
+
+(a) Construa o gráfico de perfis de médias. Há indicação efeito de interação entre as drogas X e Y?
+
+### Resolução
+
+Seja 
+SX = Sem a utilização do medicamento X;
+SY = Sem a utilização do medicamento Y;
+CX = Com a utilização do medicamento X;
+CY = Com a utilização do medicamento Y
+
+\center
+```{r warning=F, echo=F, message=F, out.width='70%'}
+library(reshape2)
+library(dplyr)
+library(ggplot2)
+X <- c("SX","SX","SX","SX","CX","CX","CX","CX","SX","SX","SX","SX","CX","CX","CX","CX")
+Y <- c("SY","SY","SY","SY","SY","SY","SY","SY","CY","CY","CY","CY","CY","CY","CY","CY")
+Valores <- c(0.02,-0.01,-0.03,0.04,0.15,0.27,0.14,0.22,0.18,0.24,0.11,0.18,0.45,0.58,0.35,0.48)
+tabela <- data.frame(X,Y,Valores)
+
+
+SCY = c("SY","CY")
+SX = c(0.005,0.1775)
+CX = c(0.195,0.465)
+media <- data.frame(SCY,SX,CX)
+
+data2 <- melt(media, SCY.vars = "SCY")
+data2 <- group_by(data2, SCY)
+names(data2) <- c("Y","X","Medias")
+ggplot(data2) +
+  geom_line(aes(X, Medias, group = Y,
+                linetype = Y))+ ggtitle("Gráfico 1: gráfico de perfis de médias")
+
+```
+\justify
+
+Podemos visualizar pelo gráfico que quase não há interação pois as retas estão práticamente paralelas entre si.
+
+\newpage
+
+(b) Ajuste um modelo de ANOVA para estes dados. Apresente o modelo estrutural e distribucional adotados. Realize uma análise de diagnóstico das premissas do modelo. Discuta os resultados.
+
+### Resolução
+
+Tabelas 1 e 2: Médias da taxa de crescimento com a presença ou ausência dos medicamentos X e Y.
+
+```{r echo = F}
+tapply(tabela$Valores,tabela$Y, mean)
+tapply(tabela$Valores,tabela$X, mean)
+```
+\center
+Gráficos 2 e 3: Boxplot's da taxa de crescimento com a presença ou ausência dos medicamentos X ou Y
+
+```{r echo=F, out.width='70%'}
+par(mfrow = c(1,2))
+boxplot(Valores ~ X, data = tabela)
+boxplot(Valores ~ Y, data = tabela)
+```
+\justify
+Pelos gráficos 2 e 3 podemos notar que os medicamentos tem indícios que causam efeito positivo no crescimento.
+\center
+
+\newpage
+Gráfico 4: Boxplot da taxa de crescimento com a presença ou ausência dos medicamentos X e Y
+```{r echo=F,out.width='60%'}
+par(mfrow = c(1,1))
+boxplot(Valores ~ X:Y, data = tabela)
+```
+\justify
+
+No gráfico 4, já podemos notar que quando é utilizado os dois medicamentos a média de crescimento é maior. 
+
+```{r echo=F}
+m1 = lm(Valores ~ X*Y, data = tabela)
+an <- anova(m1)
+knitr::kable(caption = "Tabela de ANOVA", an)
+```
+
+O modelo estrutural é: $Y_{ijk} = \mu + T_{i} + \beta_{j} + \gamma_{ij} + e_{ijk}$ e o modelo distribuicional é: $e_{ijk} \sim N(0;\sigma^2); Y_{ijk} \sim N(\mu_{ij};\sigma^2)$.
+
+\center
+```{r echo=F,out.width='70%'}
+fit <- aov(Valores~X*Y, tabela)
+anov <- anova(fit)
+s2 <- anov$"Mean Sq"[2]
+par(mfrow=c(2,2))
+plot(fit$residuals, type="l") 
+title("Gráfico 5:Resíduos vs indíce")
+abline(h=0, col="red")
+
+plot(fit$fit, fit$res, xlab="Valores Ajustados", ylab="Resíduos")
+title("Gráfico 6:Resíduos vs Preditos")
+
+res <- fit$res 
+Respad <- (res/sqrt(s2))
+hist(Respad, main=NULL)
+title("Gráfico 7:Histograma dos resíduos padronizados")
+
+qqnorm(res,ylab="Resíduos", main=NULL)
+qqline(res)
+title("Gráfico8:QQ-Plot Normal")
+```
+\justify
+
+No gráfico 5 é possível ver a independência dos resíduos. No gráfico 6, existe homocedasticidade nos dados. Nos gráficos 7 e 8 existe normalidade nos dados.
+
+Tabela 4: Teste de normalidade
+```{r echo=F}
+shapiro.test(res)
+```
+
+O teste da tabela 4 confirma a normalidade dos dados a um nível de significância de 5%.
+
+(c) Apresente contrastes apropriados entre as médias dos quatro tratamentos (A, B, C e D) que possam ser usados para testar os efeitos principais e de efeito de interação entre as drogas X e Y. Para estes contrastes obtenha intervalos de confiança.
+
+### Resolução
+
+Tabela 5: intervalos de confiança
+```{r echo=F}
+a1 = aov(Valores ~ X*Y, data = tabela)
+TukeyHSD(a1)
+```
+
+Os intervalos de confiança apontam que quando há a presença de pelo menos um medicamento a média de crescimento é maior. Quando comparamos o uso de apenas um deles com o uso conjunto, ao utilizar os dois a média é maior. Mas quasndo comparamos o uso de apenas do medicamento X com apenas o Y, não a diferença na média.
+
+\newpage
+(d) Como os medicamentos X e Y devem ser administrados para se obter eficiência máxima no desenvolvimento infantil?
+
+### Resolução
+
+A melhor maneira de administrar os medicamentos para se obter eficiência máxima no desenvolvimento infantil é de ingerir os dois medicamentos combinados.
+
+# Exercício 2
+
+Uma companhia pretende aumentar suas vendas e para isso adotará um programa de incentivo. Três diferentes programas foram propostos e estão sendo aplicados. A companhia tem 4 departamentos de vendas (D1, D2, D3 e D4) e 9 vendedores de cada departamento foram aleatoriamente selecionados e alocados a participarem de três programas de incentivo (P1, P2 ou P3). Ao final da campanha os vendedores foram avaliados quanto ao número de itens vendidos. Os resultados estão apresentados a seguir:
+\center
+\begin{tabular}{lccc}
+\hline
+ & \textbf{P1} & \textbf{P2} & \textbf{P3} \\ \hline
+\textbf{D1} & 16 & 18 & 17 \\
+\textbf{} & 22 & 27 & 34 \\
+\textbf{} & 9 & 15 & 13 \\ \hline
+\textbf{D2} & 8 & 13 & 14 \\
+\textbf{} & 7 & 5 & 12 \\
+\textbf{} & 6 & 11 & 10 \\ \hline
+\textbf{D3} & \multicolumn{1}{l}{44} & \multicolumn{1}{l}{31} & \multicolumn{1}{l}{28} \\
+\textbf{} & \multicolumn{1}{l}{27} & \multicolumn{1}{l}{33} & \multicolumn{1}{l}{54} \\
+\textbf{} & \multicolumn{1}{l}{22} & \multicolumn{1}{l}{19} & \multicolumn{1}{l}{39} \\ \hline
+\textbf{D4} & \multicolumn{1}{l}{17} & \multicolumn{1}{l}{19} & \multicolumn{1}{l}{24} \\
+ & \multicolumn{1}{l}{17} & \multicolumn{1}{l}{23} & \multicolumn{1}{l}{28} \\
+ & \multicolumn{1}{l}{14} & \multicolumn{1}{l}{17} & \multicolumn{1}{l}{31} \\ \hline
+\end{tabular}
+\justify
+Realize uma Análise de Variância dos dados, faça suposições necessárias e conclua sobre a eficiência da campanha de incentivo.
+
+### Resolução
+
+\center
+```{r echo=F , message=F, out.width='60%'}
+P <- c("P1","P1","P1","P1","P1","P1","P1","P1","P1","P1","P1","P1","P2","P2","P2","P2","P2","P2","P2","P2","P2","P2","P2","P2","P3","P3","P3","P3","P3","P3","P3","P3","P3","P3","P3","P3")
+D <- c("D1","D1","D1","D2","D2","D2","D3","D3","D3","D4","D4","D4","D1","D1","D1","D2","D2","D2","D3","D3","D3","D4","D4","D4","D1","D1","D1","D2","D2","D2","D3","D3","D3","D4","D4","D4")
+Valores <- c(16,22,9,8,7,6,44,27,22,17,17,14,18,27,15,13,5,11,31,33,19,19,23,17,17,34,13,14,12,10,28,54,39,24,28,31)
+companhia <- data.frame(P,D,Valores)
+Ps <- c("P1","P2","P3")
+D1 <- c(mean(Valores[1:3]),mean(Valores[13:15]),mean(Valores[25:27]))
+D2 <- c(mean(Valores[4:6]),mean(Valores[16:18]),mean(Valores[28:30]))
+D3 <- c(mean(Valores[7:9]),mean(Valores[19:21]),mean(Valores[31:33]))
+D4 <- c(mean(Valores[10:12]),mean(Valores[22:24]),mean(Valores[34:36]))
+Medias <- data.frame(Ps,D1,D2,D3,D4)
+
+data2 <- melt(Medias, Ps.vars = "Ps")
+data2 <- group_by(data2, Ps)
+names(data2) <- c("Ps","Ds","Medias")
+ggplot(data2) +
+  geom_line(aes(Ds, Medias, group =Ps,
+                linetype = Ps))+ggtitle("Gráfico 9: gráfico de perfis de médias")
+```
+\justify
+
+Podemos verificar que os programas 1 e 3 aparentemente não possuem interação por serem praticamente paralelas entre si.
+
+Tabelas 6 e 7: Número de itens vendidos por programas ou por Departamentos
+```{r echo =F}
+tapply(companhia$Valores,companhia$P, mean)
+tapply(companhia$Valores,companhia$D, mean)
+```
+\center
+Gráficos 10 e 11: Boxplot's do número de itens vendidos por programas ou por Departamentos
+```{r echo=F, out.width='70%'}
+par(mfrow = c(1,2))
+boxplot(Valores ~ P, data = companhia)
+boxplot(Valores ~ D, data = companhia)
+```
+\justify
+
+\center
+Gráfico 12: Boxplot do número de itens vendidos por programas e por Departamentos
+```{r echo=F,out.width='70%'}
+boxplot(Valores ~ P:D, data = companhia)
+```
+\justify
+Nos gráficos 11 e 12, vemos que aparentemente o departamento 2 e 3 possuem uma grande diferença de médias.
+
+
+```{r echo=F}
+m1 = lm(Valores ~ P*D, data = companhia)
+a <- anova(m1)
+knitr::kable(caption ="Tabela de ANOVA",a)
+```
+
+Podemos verificar que não há efeito de interação, a um nível de significância de 5%.
+\center
+```{r echo=F, out.width='70%'}
+fit <- aov(Valores~P*D, companhia)
+anov <- anova(fit)
+s2 <- anov$"Mean Sq"[2]
+par(mfrow=c(2,2))
+plot(fit$residuals, type="l") 
+title("Gráfico 13:Resíduos vs indíce")
+abline(h=0, col="red")
+
+plot(fit$fit, fit$res, xlab="Valores Ajustados", ylab="Resíduos")
+title("Gráfico 14:Resíduos vs Preditos")
+
+res <- fit$res 
+Respad <- (res/sqrt(s2))
+hist(Respad, main=NULL)
+title("Gráfico 15:Histograma dos resíduos padronizados")
+
+qqnorm(res,ylab="Resíduos", main=NULL)
+qqline(res)
+title("Gráfico 16:QQ-Plot Normal")
+```
+\justify
+No gráfico 13 é possível ver a independência dos resíduos. No gráfico 14, não existe homocedasticidade nos dados. Nos gráficos 15 e 16 existe normalidade nos dados.
+
+Tabela 9: Teste de normalidade
+```{r echo=F}
+shapiro.test(res)
+```
+
+Para verificar a normalidade fazemos o teste acima.
+
+Tabela 10: intervalos de confiança para os programas
+```{r echo=F}
+a1 = aov(Valores ~ P, data = companhia)
+TukeyHSD(a1)
+```
+
+Tabela 11: intervalos de confiança para os departamentos
+```{r echo=F}
+a1 = aov(Valores ~ D, data = companhia)
+TukeyHSD(a1)
+```
+
+Podemos concluir que não há diferença entre os programas.
+E entre os departamentos: o departamento 1 é igual ao 2 que são piores que o departamento 3, o departamento 1 é igual ao 4 e o departamento 2 é pior que o 4 que por sua vez é pior que o 3.
+
+# Exercício 3
+
+Em uma reunião de negócios, Felipe, vice-presidente da empresa EE, fez a seguinte afirmação: “Eu acredito que nós temos um número exagerado de professores. Precisamos cortar custos”. Foi então, logo contestado: “Temos tantos professores quanto nossos concorrentes de outras instituições”. Felipe continuou: “Sim, mas vocês sabem que a nossa meta de ensino é B e a de outras instituições são diferentes da nossa e isso influencia na demanda de professores”. Frederico concluiu: “Calma. Vou coletar dados para podermos tomar uma decisão mais fundamentada”. Depois de alguns dias Frederico apresentou os seguintes dados da razão do número de professores pelo número de alunos (NP/NA) para 20 instituições de acordo com a meta de ensino:
+
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline
+\textbf{Instituição} & \textbf{Meta de Ensino} & \textbf{Razão NP/NA} & \textbf{Instituição} & \textbf{Meta de Ensino} & \textbf{Razão NP/NA} \\ \hline
+1 & A & 0,29 & 11 & C & 0,10 \\ \hline
+2 & A & 0,27 & 12 & C & 0,10 \\ \hline
+3 & A & 0,22 & 13 & D & 0,19 \\ \hline
+4 & A & 0,22 & 14 & D & 0,19 \\ \hline
+5 & B & 0,26 & 15 & D & 0,09 \\ \hline
+6 & B & 0,20 & 16 & D & 0,09 \\ \hline
+7 & B & 0,18 & 17 & E & 0,17 \\ \hline
+8 & B & 0,12 & 18 & E & 0,12 \\ \hline
+9 & C & 0,24 & 19 & E & 0,09 \\ \hline
+10 & C & 0,16 & 20 & E & 0,06 \\ \hline
+\end{tabular}
+
+\newpage
+(a) Que decisão deve ser tomada sobre a instituição EE ter ou não um número exagerada de professores?
+
+### Resolução
+
+Para tomar a descisão será feito um modelo de ANOVA para o delineamento completamente aleatorizado (DCA) com 1 fator em 5 níveis pois, o que se quer saber é se existe a média de professores da instituição EE é igual a média de outras instituições de acordo com a meta de ensino, apenas com uma breve analise descritiva podemos notar pelo gráfico 1 que existem diferença entre as médias de professores de acordo com a meta de ensino.
+
+\center
+Gráfico 17
+```{r echo=F, out.width='70%'}
+library(ggplot2)
+
+base.r <-c(0.29,0.27,0.22,0.22,
+          0.26,0.20,0.18,0.12,
+          0.24,0.16,0.10,0.10,
+          0.19,0.19,0.09,0.09,
+          0.17,0.12,0.09,0.06)
+base.r <- as.data.frame((matrix(base.r, 4, 5)))
+colnames(base.r) <- c("A", "B", "C", "D","E")
+
+base.r <- stack(base.r)
+colnames(base.r) <- c("Resp", "Institutos")
+
+ggplot(base.r, aes(x=Institutos, y=Resp)) +
+  geom_boxplot(fill='#A4A4A4', color="black") 
+```
+\justify
+
+Agora contruindo a tabela de ANOVA temos:
+\center
+```{r echo=F}
+base <- base.r
+
+n <- dim(base)[1]
+K <- length(levels(base$Institutos))
+
+fit <- aov(Resp~Institutos, base)
+
+# objetos que podem ser inspecionados
+anov <- anova(fit)
+knitr::kable(caption = "Tabela de ANOVA", anov)
+```
+
+\justify
+Analisando a tabela de ANOVA, podemos dizer que a um nível de significância de 5% existe diferença entre as médias de professores de acordo com a meta de ensino.
+
+Agora faremos uma análise de diagnóstico para verificar a consistencia do *p-value* obtido na tabela de ANOVA
+
+\newpage
+\center
+Gráfico 18: Análise de diagnóstico
+```{r echo=F,message=F, out.width='70%'}
+library(car)
+
+s2 <- anov$"Mean Sq"[2] # estimativa da variância residual
+
+par(mfrow=c(2,2))
+
+# Verificação de independência
+plot(fit$residuals, type="l") # res x índice das observações
+title("Resíduos vs indíce")
+abline(h=0, col="red")
+
+plot(fit$fit, fit$res, xlab="Valores Ajustados", ylab="Resíduos")
+title("Resíduos vs Preditos")
+
+res <- fit$res # extraindo resíduos
+Respad <- (res/sqrt(s2)) # resíduos padronizados
+hist(Respad, main=NULL)
+title("Histograma dos resíduos padronizados")
+
+qqnorm(res,ylab="Residuos", main=NULL)
+qqline(res)
+title("QQ-Plot Normal")
+
+# Teste de normalidade de Shapiro-Wilk
+# Qual é a hipótese H0
+shapiro.test(res)  #conclusão?
+
+# Teste de homogeneidade de variâncias
+# Qual é a hipótese H0
+
+bartlett.test(Resp~Institutos,data=base)   #conclusão?
+```
+
+\justify
+Assim podemos notar que as suposições de Normalidade e variâncias homogêneas estão satisfeitas pois a um nível de significância de 5%, o testes de Shapiro-Wilk para normalidade apresentou um *p-value* de 0.17, logo não rejeitamos a hipótese nula de que os dados seguem uma distribuição normal, agora para testar se as variâncias são homegêneas utilizamos o teste de Bartlett que apresentou um *p-value* de 0.89, logo não rejeitamos a hipótese nula de que os dados são homocedásticos, para a hipótese de independencia apenas pela análise descritiva do gráfico 2 podemos concluir que as três suposições para o modelo ANOVA estão satisfeitas.
+
+Agora para responder a pergunta de que decisão deve ser tomada sobre a instituição EE ter ou não um número exagerada de professores, faremos comparações múltiplas pelo método de Dunnet pois nossa temos um grupo de referência que no caso são os Institutos com meta de ensino B.
+
+```{r echo=F, message=F}
+library(asbio)
+
+fit.du <- with(base, pairw.anova(y=Resp, x=Institutos, control="B", method="dunnett"))
+d <- as.data.frame(fit.du$summary)
+row.names(d) <- fit.du$comp
+
+knitr::kable(caption = "Comparação pelo método de Dunnet (conf=95%) ", d)
+```
+
+
+Com isso nós podemos responder a pergunta inicial sobre a instituição EE ter ou não um número exagerada de professores, de fato a instituição EE tem a mesma quantidade de professores do que as outras instituições independente da meta de ensino.
+
+(b) Na reunião, Felipe questionou: Mas, e se compararmos apenas aquelas que o usam a Meta B com E? Como essa informação pode ser usada na análise? Sua inclusão modifica a decisão sugerida em a)? Faça suposições necessárias.
+
+### Resolução
+
+Se compararmos apenas aquelas que o usam a Meta B com E, o modelo de ANOVA se resume a um teste T de comparação de médias, assim mantendo as suposições de normalidade, independencia e homocedasticidade, fazendo os testes temos que:
+
+\center
+Gráfico 19: Verificação da hipótese de independencia
+```{r echo=F, out.width='60%'}
+
+base.r1 <-c(0.26,0.20,0.18,0.12,
+           0.17,0.12,0.09,0.06)
+base.r1 <- as.data.frame((matrix(base.r1, 4, 2)))
+colnames(base.r1) <- c("B", "E")
+
+base.r1 <- stack(base.r1)
+colnames(base.r1) <- c("Resp", "Institutos")
+
+fit <- aov(Resp~Institutos,base.r1)
+
+res <- fit$res # extraindo resíduos
+
+# Verificação de independência
+plot(fit$residuals, type="l") # res x índice das observações
+title("Resíduos vs indíce")
+abline(h=0, col="red")
+
+# Teste de normalidade de Shapiro-Wilk
+shapiro.test(res)  
+
+# Teste de homogeneidade de variâncias
+bartlett.test(Resp~Institutos,data=base.r1)   
+
+```
+\justify
+
+Assim podemos conlcuir que a hipótese de independencia esta satisfeita pela análise do gráfico 4, fixando um nível de significância de 5% a hipótese de normalidade também pois obtivemos um *p-value* de 0.76, portanto não rejeitamos a hipótese de que os dados tem distribuição normal, para a homocedasticidade o teste de Bartlett nos retornou um *p-value* de 0.74 o que nos faz não rejeitar a hipótese de variâncias homogêneas, satisfeitas todas as hipóteses podemos prosseguir com o teste T de comparação de médias, onde as hipóteses podem ser difinidas como:
+
+$$\left\{ \begin{array}{ll}
+H_0:\mu_B - \mu_E = 0 \\ 
+H_1:\mu_B - \mu_E  \neq 0  \end{array} \right.\ $$ 
+
+```{r echo=F}
+t.test(base.r1$Resp~base.r1$Institutos, var.equal=T)
+```
+
+Assim a um nível de significância de 5% não rejeitamos a hipótese nula, logo assim como no item a, não obtivemos diferença entre os Institutos com metas de ensino B e E. Essa informação pode ser usada na análise apenas para frisar a ideia de que não diferença entre as médias de Institutos, provando que vice presidente da EE estava errado.
+
+# Exercício 4
+
+Um experimento tem por finalidade estabelecer condições ótimas para o funcionamento de um sistema de tratamento de água. Os seguintes fatores (e seus níveis) estão envolvidos na operação:
+
+A: Concentração de reagente de biomassa (3000 e 6000 mg/l)
+
+B: Concentração de clarificador de biomassa (8000 e 12000mg/l)
+
+C: Taxa de fluxo (78.5 e 940 m3/d)
+
+Uma variável Y, que mede a qualidade da água, é adotada no estudo. Suponha que o interesse do experimento seja encontrar os níveis dos fatores que maximizam a qualidade da água. Os resultados são mostrados a seguir:
+
+\center
+\begin{tabular}{cccc}
+\hline
+\textbf{A} & \textbf{B} & \textbf{C} & \textbf{Y} \\ \hline
+-1 & -1 & -1 & 195 \\
+-1 & -1 & 1 & 496 \\
+-1 & 1 & -1 & 87 \\
+-1 & 1 & 1 & 1371 \\
+1 & -1 & -1 & 102 \\
+1 & -1 & 1 & 1001 \\
+1 & 1 & -1 & 354 \\
+1 & 1 & 1 & 775 \\ \hline
+\end{tabular}
+
+\justify
+
+(a) Que delineamento experimental foi adotado no estudo? Que limitações podem ser apontadas?
+
+### Resolução
+
+O delineamento experimental adotado foi o completamente aleatorizado com 2 fatores (2 x 2 x 2). As limitações que podem ser oberservadas são é que temos uma obervação por fator e nível, logo não teremos não temos réplicas, assim não podemos ajustar um modelo completo com todas as interações, pois não teriamos graus de liberdade para os resíduos.
+
+(b) Construa gráficos apropriados para representar os efeitos principais e de interação de primeira (aos pares de tratamentos) e segunda ordem (para os três tratamentos) entre os fatores sob estudo. Comente.
+\newpage
+
+### Resolução
+
+\center
+Gráfico 20: Perfis de média (A com B)
+```{r echo=F, out.width='70%'}
+A <- c(rep("-1",4),rep("1",4))
+B <- c("-1","-1","1","1","-1","-1","1","1")
+C <- c("-1","1","-1","1","-1","1","-1","1")
+Y <- c(195,496,87,1371,102,1001,354,775)
+tabela <- data.frame(A,B,C,Y)
+
+with(tabela, {
+  interaction.plot(A, B, Y)
+})
+```
+
+Gráfico 21: Perfis de média (A com C)
+```{r echo=F, out.width='70%'}
+with(tabela, {
+  interaction.plot(A, C, Y)
+})
+```
+\newpage
+Gráfico 22: Perfis de média (B com C)
+```{r echo=F, out.width='70%'}
+with(tabela, {
+  interaction.plot(B, C, Y)
+})
+```
+
+Gráfico 23: Perfis de média (A:B com C)
+```{r echo=F, out.width='70%'}
+with(tabela, {
+  interaction.plot(A:B, C, Y)
+})
+```
+
+Gráfico 24: Perfis de média (Fatores)
+```{r echo=F, out.width='70%'}
+CA <- 102
+CB <- 87
+CC <- 496
+x <- c("A","B","Y")
+y <- c(CA,CB,CC)
+d <- data.frame(x,y)
+
+ggplot(d, aes(x=x, y=y, group=1)) + 
+  geom_line() +
+  geom_point() +
+  labs(x="Fatores", y="Qualidade da água")
+
+```
+\justify
+
+Podemos notar descritivamente pelos gráficos 21 e 22 que quase não há interação pois as retas estão práticamente paralelas entre si, porém nos gráficos 20 e 23 podemos notar uma diferença significativa na interação dos fatores A com B com C, pois as retas tendem a se cruzar, e no gráfico 24 notamos uma diferença significativa da média com dos fatores A e B (praticamente iguais), porém a média do fator C é muito maior sendo o componente principal para a qualidade da água.
+
+(c) Proponha uma modelo de ANOVA (reduzido) para estes dados. Como os fatores influenciam na qualidade da água? Quais níveis dos fatores maximizam Y?
+
+### Resolução
+
+```{r, echo=F,message=F, out.width='70%'}
+fit <- aov(Y ~ A + B+ C, tabela)
+fit1 <- anova(fit)
+knitr::kable(caption = "Tabela de ANOVA", fit1)
+TukeyHSD(fit)
+```
+
+Assim como esperado, os fatores A com B tem médias iguais a um nível de siginificância de 5%, porém o fator C não tem média igual os outros, no caso é maior que dos fatores A e B, mas também podemos notar uma interação entre os fatores A, B e C ao mesmo tempo. Os níveis que maximizam Y são do fator A é concentração de reagente de biomassa 3000 mg/l do fator B concentração de clarificador de biomassa 12000mg/l e do fator C taxa de fluxo 940 m3/d.
+
+
+# Exercício 6
+
+Quando a polpa de frutas secas é usada na gastronomia, a presença de granulações afeta negativamente qualidades sensoriais dos alimentos. Um experimento foi conduzido para determinar como essa sensação é afetada pela temperatura de secagem (TE), acidez (pH) da polpa e teor de açúcar (TA). Duas replicações foram consideradas. As medidas dessa sensação são apresentadas a seguir. Analise os dados para determinar quais fatores influenciam a sensação de granulações no alimento e qual combinação de fatores leva a uma menor sensação.
+
+\center
+\begin{tabular}{llcccc}
+\hline
+\textbf{} & \textbf{} & \multicolumn{2}{c}{\textbf{TA Baixo}} & \multicolumn{2}{c}{\textbf{TA Alto}} \\
+\multicolumn{1}{c}{\textbf{TE}} & \multicolumn{1}{c}{\textbf{Rep}} & \textbf{pH Baixo} & \textbf{pH Alto} & \textbf{pH Baixo} & \textbf{pH Alto} \\ \hline
+\multirow{2}{*}{\textbf{1}} & \textbf{1} & 21 & 12 & 13 & 1 \\
+ & \textbf{2} & 21 & 18 & 14 & 8 \\
+\multirow{2}{*}{\textbf{2}} & \textbf{1} & 23 & 14 & 13 & 1 \\
+ & \textbf{2} & 23 & 17 & 16 & 11 \\
+\multirow{2}{*}{\textbf{3}} & \textbf{1} & 17 & 20 & 16 & 14 \\
+ & \textbf{2} & 23 & 17 & 17 & 5 \\ \hline
+\end{tabular}
+\justify
+
+### Resolução
+\center
+Grafico 25: perfis de média
+```{r, echo=F, out.width='65%',message=F}
+#CARREGANDO OS DADOS
+
+base.b <- c(21, '1', 'Baixo', 'Baixo', 12, '1', 'Baixo', 'Alto', 13, '1', 'Alto', 'Baixo', 1, '1', 'Alto', 'Alto', 21, '1', 'Baixo', 'Baixo', 18, '1', 'Baixo', 'Alto', 14, '1', 'Alto', 'Baixo', 8, '1', 'Alto', 'Alto', 23, '2', 'Baixo', 'Baixo', 14, '2', 'Baixo', 'Alto', 13, '2', 'Alto', 'Baixo', 1, '2', 'Alto', 'Alto', 23, '2', 'Baixo', 'Baixo', 17, '2', 'Baixo', 'Alto', 16, '2', 'Alto', 'Baixo', 11, '2', 'Alto', 'Alto', 17, '3', 'Baixo', 'Baixo', 20, '3', 'Baixo', 'Alto', 16, '3', 'Alto', 'Baixo', 14, '3', 'Alto', 'Alto', 23, '3', 'Baixo', 'Baixo', 17, '3', 'Baixo', 'Alto', 17, '3', 'Alto', 'Baixo', 5, '3', 'Alto', 'Alto')
+
+aovbase.b <- as.data.frame(t(matrix(base.b, 4, 24))) 
+colnames(aovbase.b) <- c("resp", "TE", "TA", "pH")
+aovbase.b$resp <- as.numeric(levels(aovbase.b$resp))[aovbase.b$resp]
+
+# GRÁFICO PERFIL DE MÉDIAS. 
+
+par(mfrow=c(1,2))
+with(aovbase.b, {
+  interaction.plot(TE, TA, resp)
+  interaction.plot(TE, pH, resp)
+})
+par(mfrow=c(1,1))
+with(aovbase.b, {
+  interaction.plot(TA, pH, resp)
+})
+```
+\justify
+
+Pelos gráficos plotados, temos que não há interação entre TA e Ph. Temos também que pode não haver uma interção entre os fatores TA-TE e Ph-TE, visto que as retas nos gráficos aparentam estar quase paralelas. 
+
+```{r echo=F, out.width='70%', message=F}
+#ANOVA TE*TA*pH E COMPARAÇÃO DE MÉDIAS
+
+fit <- aov(resp ~ TE * TA * pH, aovbase.b)
+fit1 <- anova(fit)
+knitr::kable(caption = "Tabela de ANOVA", fit1)
+
+fit1 <- aov(resp ~ TA + pH, aovbase.b)
+TukeyHSD(fit1)
+```
+\center
+Gráfico 26: Comparações múltiplas
+```{r echo=F, out.width='70%', message=F}
+
+plot(TukeyHSD(fit))
+```
+\justify
+Os resultados da tabela de anova confirmam que não há significancia para considerarmos interação com nenhuma combinação de fatores. Os fatores que influenciam na granulação são TA e pH. As comparações múltiplas indicam que as combinações ALTO:ALTO(TA:Ph) são as que produzem os menor sensação de granulação.
+
+Para verificar a significância dos testes realizados acima iremos realizar uma análise de diagnósticos
+\center
+Gráfico 27: Análise de Diagnóstico
+```{r, echo=F, out.width='70%'}
+
+ava<-anova(fit)
+s2 <- ava$"Mean Sq"[8] # estimativa da variância residual
+
+par(mfrow=c(2,2))
+plot(fit)
+
+plot(fit$fit, fit$resp, xlab="Valores Ajustados", ylab="Resíduos")
+title("Resíduos vs Preditos")
+
+avres <- fit$residuals # extraindo resíduos
+respad <- (avres/sqrt(s2)) # resíduos padronizados
+boxplot(respad)
+title("Resíduos Padronizados")
+
+hist(respad, main=NULL)
+title("Histograma dos resíduos padronizados")
+
+qqnorm(avres,ylab="Residuos", main=NULL)
+qqline(avres)
+title("Gráfico Normal de Probabilidade dos Resíduos")
+
+shapiro.test(avres)
+```
+\justify
+
+A um nível de significância de 5%, não rejaitamos a hipótese de que os resíduos tem distribuição normal. Os gráficos e o teste acima indicam que as suposições para a aplicação de anova estão satisfeitas.
+
+# Códigos
+
+```{r, eval=F}
+# Exercício 1
+
+library(reshape2)
+library(dplyr)
+library(ggplot2)
+X <- c("SX","SX","SX","SX","CX","CX","CX","CX","SX","SX","SX","SX","CX","CX","CX","CX")
+Y <- c("SY","SY","SY","SY","SY","SY","SY","SY","CY","CY","CY","CY","CY","CY","CY","CY")
+Valores <- c(0.02,-0.01,-0.03,0.04,0.15,0.27,0.14,0.22,0.18,0.24,0.11,0.18,0.45,0.58,0.35,0.48)
+tabela <- data.frame(X,Y,Valores)
+
+
+SCY = c("SY","CY")
+SX = c(0.005,0.1775)
+CX = c(0.195,0.465)
+media <- data.frame(SCY,SX,CX)
+
+data2 <- melt(media, SCY.vars = "SCY")
+data2 <- group_by(data2, SCY)
+names(data2) <- c("Y","X","Medias")
+ggplot(data2) +
+  geom_line(aes(X, Medias, group = Y, linetype = Y))+ ggtitle("Gráfico 1: gráfico de perfis de médias") +ggtitle("Gráfico 1: gráfico de perfis de médias") 
+
+
+
+# item b
+tapply(tabela$Valores,tabela$Y, mean)
+tapply(tabela$Valores,tabela$X, mean)
+
+par(mfrow = c(1,2))
+boxplot(Valores ~ X, data = tabela)
+boxplot(Valores ~ Y, data = tabela)
+
+par(mfrow = c(1,1))
+boxplot(Valores ~ X:Y, data = tabela)
+
+m1 = lm(Valores ~ X*Y, data = tabela)
+an <- anova(m1)
+knitr::kable(caption = "Tabela de ANOVA", an)
+
+fit <- aov(Valores~X*Y, tabela)
+anov <- anova(fit)
+s2 <- anov$"Mean Sq"[2]
+par(mfrow=c(2,2))
+plot(fit$residuals, type="l") 
+title("Gráfico 5:Resíduos vs indíce")
+abline(h=0, col="red")
+
+plot(fit$fit, fit$res, xlab="Valores Ajustados", ylab="Resíduos")
+title("Gráfico 6:Resíduos vs Preditos")
+
+res <- fit$res 
+Respad <- (res/sqrt(s2))
+hist(Respad, main=NULL)
+title("Gráfico 7:Histograma dos resíduos padronizados")
+
+qqnorm(res,ylab="Resíduos", main=NULL)
+qqline(res)
+title("Gráfico8:QQ-Plot Normal")
+
+shapiro.test(res)
+
+# item c
+
+a1 = aov(Valores ~ X*Y, data = tabela)
+TukeyHSD(a1)
+
+# Exercício 2
+
+P <- c("P1","P1","P1","P1","P1","P1","P1","P1","P1","P1","P1","P1","P2","P2","P2","P2","P2","P2","P2","P2","P2","P2","P2","P2","P3","P3","P3","P3","P3","P3","P3","P3","P3","P3","P3","P3")
+D <- c("D1","D1","D1","D2","D2","D2","D3","D3","D3","D4","D4","D4","D1","D1","D1","D2","D2","D2","D3","D3","D3","D4","D4","D4","D1","D1","D1","D2","D2","D2","D3","D3","D3","D4","D4","D4")
+Valores <- c(16,22,9,8,7,6,44,27,22,17,17,14,18,27,15,13,5,11,31,33,19,19,23,17,17,34,13,14,12,10,28,54,39,24,28,31)
+companhia <- data.frame(P,D,Valores)
+Ps <- c("P1","P2","P3")
+D1 <- c(mean(Valores[1:3]),mean(Valores[13:15]),mean(Valores[25:27]))
+D2 <- c(mean(Valores[4:6]),mean(Valores[16:18]),mean(Valores[28:30]))
+D3 <- c(mean(Valores[7:9]),mean(Valores[19:21]),mean(Valores[31:33]))
+D4 <- c(mean(Valores[10:12]),mean(Valores[22:24]),mean(Valores[34:36]))
+Medias <- data.frame(Ps,D1,D2,D3,D4)
+
+data2 <- melt(Medias, Ps.vars = "Ps")
+data2 <- group_by(data2, Ps)
+names(data2) <- c("Ps","Ds","Medias")
+ggplot(data2) +
+  geom_line(aes(Ds, Medias, group =Ps,
+                linetype = Ps))+ggtitle("Gráfico 9: gráfico de perfis de médias")
+
+tapply(companhia$Valores,companhia$P, mean)
+tapply(companhia$Valores,companhia$D, mean)
+
+par(mfrow = c(1,2))
+boxplot(Valores ~ P, data = companhia)
+boxplot(Valores ~ D, data = companhia)
+
+boxplot(Valores ~ P:D, data = companhia)
+
+m1 = lm(Valores ~ P*D, data = companhia)
+a <- anova(m1)
+knitr::kable(caption ="Tabela de ANOVA",a)
+
+fit <- aov(Valores~P*D, companhia)
+anov <- anova(fit)
+s2 <- anov$"Mean Sq"[2]
+par(mfrow=c(2,2))
+plot(fit$residuals, type="l") 
+title("Gráfico 13:Resíduos vs indíce")
+abline(h=0, col="red")
+
+plot(fit$fit, fit$res, xlab="Valores Ajustados", ylab="Resíduos")
+title("Gráfico 14:Resíduos vs Preditos")
+
+res <- fit$res 
+Respad <- (res/sqrt(s2))
+hist(Respad, main=NULL)
+title("Gráfico 15:Histograma dos resíduos padronizados")
+
+qqnorm(res,ylab="Resíduos", main=NULL)
+qqline(res)
+title("Gráfico 16:QQ-Plot Normal")
+
+shapiro.test(res)
+
+a1 = aov(Valores ~ P, data = companhia)
+TukeyHSD(a1)
+
+a1 = aov(Valores ~ D, data = companhia)
+TukeyHSD(a1)
+
+# Exercício 3
+
+# item a
+
+# Preparação dos dados
+
+library(car)
+library(ggplot2)
+library(asbio)
+
+base.r <-c(0.29,0.27,0.22,0.22,
+          0.26,0.20,0.18,0.12,
+          0.24,0.16,0.10,0.10,
+          0.19,0.19,0.09,0.09,
+          0.17,0.12,0.09,0.06)
+base.r <- as.data.frame((matrix(base.r, 4, 5)))
+colnames(base.r) <- c("A", "B", "C", "D", "E")
+
+base.r <- stack(base.r)
+colnames(base.r) <- c("Resp", "Institutos")
+
+# Análise dos dados 
+
+base <- base.r
+
+n <- dim(base)[1]
+K <- length(levels(base$Institutos))
+
+# box-plots
+# verificar visualmente problemas:
+# pontos atípicos, assimetria e variâncias heterogêneas
+ggplot(base.r, aes(x=Institutos, y=Resp)) +
+  geom_boxplot(fill='#A4A4A4', color="black") 
+
+##########################################################
+# Ajuste do modelo de ANOVA (DCA com 1 fator em K níveis)
+##########################################################
+
+fit <- aov(Resp~Institutos, base)
+
+anov <- anova(fit)
+names(anov)
+anov
+
+# O que podemos concluir dessa análise? Qual é a hipótese em teste?
+
+# Diagnóstico - Análise de resíduos
+
+s2 <- anov$"Mean Sq"[2] # estimativa da variância residual
+
+par(mfrow=c(2,2))
+
+# Verificação de independência
+plot(fit$residuals, type="l") # res x índice das observações
+title("Resíduos vs indíce")
+abline(h=0, col="red")
+
+plot(fit$fit, fit$res, xlab="Valores Ajustados", ylab="Resíduos")
+title("Resíduos vs Preditos")
+
+res <- fit$res # extraindo resíduos
+Respad <- (res/sqrt(s2)) # resíduos padronizados
+hist(Respad, main=NULL)
+title("Histograma dos resíduos padronizados")
+
+qqnorm(res,ylab="Residuos", main=NULL)
+qqline(res)
+title("QQ-Plot Normal")
+
+# Teste de normalidade de Shapiro-Wilk
+# Qual é a hipótese H0
+shapiro.test(res)  #conclusão?
+
+# Teste de homogeneidade de variâncias
+bartlett.test(Resp~Institutos,data=base)  
+
+# Compações Múltiplas
+fit.du <- with(base, pairw.anova(y=Resp, x=Institutos, control="B", method="dunnett"))
+d<-as.data.frame(fit.du$summary)
+row.names(d) <- fit.du$comp
+
+# item b
+
+base.r1 <-c(0.26,0.20,0.18,0.12,
+            0.17,0.12,0.09,0.06)
+base.r1 <- as.data.frame((matrix(base.r1, 4, 2)))
+colnames(base.r1) <- c("B", "E")
+
+base.r1 <- stack(base.r1)
+colnames(base.r1) <- c("Resp", "Institutos")
+
+fit <- aov(Resp~Institutos,base.r1)
+
+res <- fit$res # extraindo resíduos
+# Teste de normalidade de Shapiro-Wilk
+shapiro.test(res)  
+
+# Teste de homogeneidade de variâncias
+bartlett.test(Resp~Institutos,data=base.r1)   
+
+# Verificação de independência
+plot(fit$residuals, type="l") # res x índice das observações
+title("Resíduos vs indíce")
+abline(h=0, col="red")
+t.test(base.r1$Resp~base.r1$Institutos, var.equal=T)
+
+# Exercício 4
+
+#item b
+
+A <- c(rep("-1",4),rep("1",4))
+B <- c("-1","-1","1","1","-1","-1","1","1")
+C <- c("-1","1","-1","1","-1","1","-1","1")
+Y <- c(195,496,87,1371,102,1001,354,775)
+tabela <- data.frame(A,B,C,Y)
+
+with(tabela, {
+  interaction.plot(A, B, Y)
+})
+
+with(tabela, {
+  interaction.plot(A, C, Y)
+})
+
+with(tabela, {
+  interaction.plot(B, C, Y)
+})
+
+with(tabela, {
+  interaction.plot(A:B, C, Y)
+})
+
+CA <- 102
+CB <- 87
+CC <- 496
+x <- c("A","B","Y")
+y <- c(CA,CB,CC)
+d <- data.frame(x,y)
+
+ggplot(d, aes(x=x, y=y, group=1)) + 
+  geom_line() +
+  geom_point() +
+  labs(x="Fatores", y="Qualidade da água")
+
+# item c
+
+fit <- aov(Y ~ A+B+C+A*B*C-A:C, tabela)
+fit1 <- anova(fit)
+knitr::kable(caption = "Tabela de ANOVA", fit1)
+TukeyHSD(fit)
+
+# Exercício 6
+
+
+base.b <- c(21, '1', 'Baixo', 'Baixo', 12, '1', 'Baixo', 'Alto', 13, '1', 'Alto', 'Baixo', 1, '1', 'Alto', 'Alto', 21, '1', 'Baixo', 'Baixo', 18, '1', 'Baixo', 'Alto', 14, '1', 'Alto', 'Baixo', 8, '1', 'Alto', 'Alto', 23, '2', 'Baixo', 'Baixo', 14, '2', 'Baixo', 'Alto', 13, '2', 'Alto', 'Baixo', 1, '2', 'Alto', 'Alto', 23, '2', 'Baixo', 'Baixo', 17, '2', 'Baixo', 'Alto', 16, '2', 'Alto', 'Baixo', 11, '2', 'Alto', 'Alto', 17, '3', 'Baixo', 'Baixo', 20, '3', 'Baixo', 'Alto', 16, '3', 'Alto', 'Baixo', 14, '3', 'Alto', 'Alto', 23, '3', 'Baixo', 'Baixo', 17, '3', 'Baixo', 'Alto', 17, '3', 'Alto', 'Baixo', 5, '3', 'Alto', 'Alto')
+
+aovbase.b <- as.data.frame(t(matrix(base.b, 4, 24))) 
+colnames(aovbase.b) <- c("resp", "TE", "TA", "pH")
+aovbase.b$resp <- as.numeric(levels(aovbase.b$resp))[aovbase.b$resp]
+
+# GRÁFICO PERFIL DE MÉDIAS. 
+
+par(mfrow=c(1,2))
+with(aovbase.b, {
+  interaction.plot(TE, TA, resp)
+  interaction.plot(TE, pH, resp)
+})
+par(mfrow=c(1,1))
+with(aovbase.b, {
+  interaction.plot(TA, pH, resp)
+})
+
+#ANOVA TE*TA*pH E COMPARAÇÃO DE MÉDIAS
+
+fit <- aov(resp ~ TE * TA * pH, aovbase.b)
+fit1 <- anova(fit)
+knitr::kable(caption = "Tabela de ANOVA", fit1)
+
+fit1 <- aov(resp ~ TA + pH, aovbase.b)
+TukeyHSD(fit1)
+
+plot(TukeyHSD(fit))
+
+
+ava<-anova(fit)
+s2 <- ava$"Mean Sq"[8] # estimativa da variância residual
+
+par(mfrow=c(2,2))
+plot(fit)
+
+plot(fit$fit, fit$resp, xlab="Valores Ajustados", ylab="Resíduos")
+title("Resíduos vs Preditos")
+
+avres <- fit$residuals # extraindo resíduos
+respad <- (avres/sqrt(s2)) # resíduos padronizados
+boxplot(respad)
+title("Resíduos Padronizados")
+
+hist(respad, main=NULL)
+title("Histograma dos resíduos padronizados")
+
+qqnorm(avres,ylab="Residuos", main=NULL)
+qqline(avres)
+title("Gráfico Normal de Probabilidade dos Resíduos")
+
+shapiro.test(avres)
+
+```
+
